@@ -1,5 +1,6 @@
 var fs = require('fs')
 var path = require('path')
+var getOptions = require('loader-utils').getOptions;
 
 var defaultOptions = {
   pattern: {
@@ -10,7 +11,6 @@ var defaultOptions = {
 }
 
 module.exports = function (source) {
-
   var loader = this
 
   loader.callback = loader.async()
@@ -24,10 +24,9 @@ module.exports = function (source) {
 function parse(loader, source) {
 
   try {
-
     var filepath = loader.resourcePath
     var filepathParse = path.parse(filepath)
-    var options = Object.assign({}, defaultOptions, loader.options.includes)
+    var options = Object.assign({}, defaultOptions, getOptions(loader))
 
     if (typeof options.pattern === 'function') {
       options.pattern = options.pattern(filepath)
@@ -36,8 +35,8 @@ function parse(loader, source) {
     if (!options.pattern) {
       options.pattern = defaultOptions.pattern
     } else if (!(
-      options.pattern.re instanceof RegExp && 
-      Number.isInteger(options.pattern.index) && 
+      options.pattern.re instanceof RegExp &&
+      Number.isInteger(options.pattern.index) &&
       options.pattern.index > -1
     )) {
       throw new Error('includes-loader: pattern is invalid')
@@ -52,22 +51,20 @@ function parse(loader, source) {
     if (Array.isArray(options.extensions) && options.extensions.length === 0) {
       options.extensions = [filepathParse.ext]
     } else if (!(
-      Array.isArray(options.extensions) && 
+      Array.isArray(options.extensions) &&
       options.extensions.length > 0
     )) {
       throw new Error('includes-loader: extensions is invalid')
     }
 
-    loader.source = source
-
-    loader.options = options
-
-    loader.includes = []
-
+    options.source = source
+    //loader.options = options
+    //loader.includes = []
+    options.includes = []
     if (options.pattern.re.test(source)) {
-      parseIncludes(loader, filepath, source)
+      parseIncludes(loader, options, filepath, source)
     } else {
-      loader.callback(null, 'module.exports = ' + JSON.stringify(loader.source))
+      loader.callback(null, 'module.exports = ' + JSON.stringify(options.source))
     }
 
   } catch (err) {
@@ -76,24 +73,23 @@ function parse(loader, source) {
 
 }
 
-function parseIncludes(loader, filepath, data) {
+function parseIncludes(loader, options, filepath, data) {
 
   try {
-
     var fileparse = path.parse(filepath)
 
-    data.replace(loader.options.pattern.re, function () {
+    data.replace(options.pattern.re, function () {
 
       var include = {
         iDir: fileparse.dir,
-        iPath: arguments[loader.options.pattern.index],
+        iPath: arguments[options.pattern.index],
         iTarget: arguments[0],
-        iExtensions: [].concat(loader.options.extensions)
+        iExtensions: [].concat(options.extensions)
       }
 
-      loader.includes.push({include})
+      options.includes.push({include})
 
-      parseFile(loader, include)
+      parseFile(loader, options, include)
 
     })
 
@@ -102,25 +98,34 @@ function parseIncludes(loader, filepath, data) {
   }
 }
 
+function hasExt(path) {
+  return !!path.extname(path)
+}
 
-function parseFile(loader, include) {
+function parseFile(loader, options, include) {
   try {
-    var extension = include.iExtensions.shift()
-    var filepath = path.resolve(include.iDir, include.iPath + extension)
+    var extension, filepath
+    if (path.extname(include.iPath)) {
+      include.iExtensions = []
+      filepath = path.resolve(include.iDir, include.iPath)
+    } else {
+      extension = include.iExtensions.shift()
+      filepath = path.resolve(include.iDir, include.iPath + extension)
+    }
     fs.readFile(filepath, 'utf-8', function (err, data) {
       if (err) {
         if (include.iExtensions.length) {
-          parseFile(loader, include)
+          parseFile(loader, options, include)
         } else {
           loader.callback(new Error('includes-loader: can not find file ' + filepath))
         }
       } else {
-        var index = loader.includes.indexOf(include)
-        loader.source = loader.source.replace(include.iTarget, data)
-        loader.includes.splice(index, 1)
-        parseIncludes(loader, filepath, data)
-        if (loader.includes.length === 0) {
-          loader.callback(null, 'module.exports = ' + JSON.stringify(loader.source))
+        var index = options.includes.indexOf(include)
+        options.source = options.source.replace(include.iTarget, data)
+        options.includes.splice(index, 1)
+        parseIncludes(loader, options, filepath, data)
+        if (options.includes.length === 0) {
+          loader.callback(null, 'module.exports = ' + JSON.stringify(options.source))
         }
       }
     })
@@ -128,17 +133,3 @@ function parseFile(loader, include) {
     loader.callback(err)
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
