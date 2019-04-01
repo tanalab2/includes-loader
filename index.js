@@ -12,7 +12,6 @@ var defaultOptions = {
 
 module.exports = function (source) {
   var loader = this
-
   loader.callback = loader.async()
 
   loader.cacheable()
@@ -64,7 +63,7 @@ function parse(loader, source) {
     if (options.pattern.re.test(source)) {
       parseIncludes(loader, options, filepath, source)
     } else {
-      loader.callback(null, 'module.exports = ' + JSON.stringify(options.source))
+      loader.callback(null, options.source)
     }
 
   } catch (err) {
@@ -125,7 +124,7 @@ function parseFile(loader, options, include) {
         options.includes.splice(index, 1)
         parseIncludes(loader, options, filepath, data)
         if (options.includes.length === 0) {
-          loader.callback(null, 'module.exports = ' + JSON.stringify(options.source))
+          loader.callback(null, options.source)
         }
       }
     })

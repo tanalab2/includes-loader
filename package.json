@@ -28,8 +28,9 @@
   "license": "MIT",
   "devDependencies": {
     "chai": "^4.2.0",
-    "jsdom": "^10.1.0",
+    "loader-runner": "^3.0.0",
     "loader-utils": "^1.1.0",
+    "markdown-loader": "^5.0.0",
     "mocha": "^5.2.0",
     "webpack": "^4.25.0"
   }
